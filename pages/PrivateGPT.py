@@ -29,9 +29,11 @@ class ChatCallbackHandler(BaseCallbackHandler):
         self.message += token
         self.message_box.markdown(self.message)
     
+with st.sidebar:
+    selected_model = st.selectbox("Select AI Model", ("llama3.1", "mistral", "gemma2"))
 
 llm = ChatOllama(
-    model="mistral:latest",
+    model=f"{selected_model}:latest",
     temperature=0.1,
     streaming=True,
     callbacks=[
@@ -39,7 +41,7 @@ llm = ChatOllama(
     ]
 )
 
-llm_for_memory = ChatOllama(model="mistral:latest",temperature=0.1)
+llm_for_memory = ChatOllama(model=f"{selected_model}:latest",temperature=0.1)
 
 
 @st.cache_resource
@@ -70,7 +72,7 @@ def embed_file(file):
     loader = UnstructuredFileLoader(file_path)
     docs = loader.load_and_split(text_splitter=splitter)
     embeddings = OllamaEmbeddings(
-        model="mistral:latest"
+        model=f"{selected_model}:latest"
     )
     cached_embeddings = CacheBackedEmbeddings.from_bytes_store(embeddings, cache_dir)
     vetorstore = FAISS.from_documents(docs, cached_embeddings)
@@ -120,7 +122,7 @@ Upload your file in the sidebar
             
 Also, you can use this model in off-line!
             
-You shold intall Oll
+You shold intall Ollama
 """)
 
 with st.sidebar:
