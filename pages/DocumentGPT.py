@@ -1,5 +1,5 @@
 import streamlit as st
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.embeddings import CacheBackedEmbeddings
 from langchain.storage import LocalFileStore
 from langchain.document_loaders import UnstructuredFileLoader
@@ -8,6 +8,7 @@ from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.schema.runnable import RunnablePassthrough, RunnableLambda
 from langchain.callbacks.base import BaseCallbackHandler
+from langchain.memory import ConversationSummaryBufferMemory
 from langchain.chat_models import ChatOpenAI
 
 st.set_page_config(
@@ -36,6 +37,18 @@ llm = ChatOpenAI(
         ChatCallbackHandler(),
     ]
 )
+
+llm_for_memory = ChatOpenAI(temperature=0.1)
+
+
+@st.cache_resource
+def init_memory():
+    return ConversationSummaryBufferMemory(
+        llm=llm_for_memory,
+        max_token_limit=120,
+        memory_key="chat_history",
+        return_messages=True
+    )
 
 @st.cache_resource(show_spinner="Embedding file...")
 def embed_file(file):
@@ -77,6 +90,10 @@ def paint_history():
 def format_docs(docs):
     return "\n\n".join(document.page_content for document in docs)
 
+def load_memory(_):
+    return memory.load_memory_variables({})["chat_history"]
+
+memory = init_memory()
 
 prompt = ChatPromptTemplate.from_messages([
     ("system", """
@@ -85,6 +102,7 @@ prompt = ChatPromptTemplate.from_messages([
 
     Context: {context}
     """),
+    MessagesPlaceholder(variable_name="chat_history"),
     ("human", "{question}")
 ])
 
@@ -111,13 +129,16 @@ if file:
         send_message(message, "human")
         chain = {
             "context": retriever | RunnableLambda(format_docs),
+            "chat_history": RunnableLambda(load_memory),
             "question": RunnablePassthrough()
         } | prompt | llm
         with st.chat_message("ai"):
-            chain.invoke(message)
+            response = chain.invoke(message)
+        memory.save_context({"input": message}, {"output": response.content})
 
         # docs = retriever.invoke(message)
         # docs = "\n\n".join(document.page_content for document in docs)
         # prompt = template.format_messages(context=docs, question=message)
 else:
     st.session_state["messages"] = []
+    memory.clear()
