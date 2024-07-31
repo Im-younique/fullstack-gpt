@@ -212,6 +212,12 @@ def wiki_search(term):
     docs = retriver.get_relevant_documents(term)
     return docs
 
+def find_correct_answer(answers):
+    for answer in answers:
+        if answer["correct"]:
+            return answer["answer"]
+    return None
+
 with st.sidebar:
     docs = None
     choice = st.selectbox("Choose what you want to use.", (
@@ -240,6 +246,11 @@ if not docs:
     )
 else:
     response = run_quiz_chain(docs, topic if topic else file.name)
+
+    if response:
+        with st.sidebar:
+            switch = st.toggle("Show the correct answer for the wrong answer when you submit button click")
+
     with st.form("questions_form"):
         for question in response["questions"]:
             st.write(question["question"])
@@ -248,5 +259,10 @@ else:
                 st.success("Correct!")
             elif value is not None:
                 st.error("Wrong!")
+                if switch:
+                    correct_answer = find_correct_answer(question["answers"])
+                    st.info(f"The correct answer is {correct_answer}")
         button = st.form_submit_button()
+    
+            
         
